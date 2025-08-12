@@ -93,6 +93,100 @@ const WellSwapPlatform = () => {
     encryptionLevel: 'AES-256'
   });
 
+  // Global Insurance Market Data
+  const [mockPolicies, setMockPolicies] = useState([
+    {
+      id: 'GLB001',
+      type: 'endowment',
+      company: 'AIA Hong Kong',
+      productName: 'Premier Retirement Savings Plan',
+      annualPremium: 50000,
+      paidYears: 8,
+      totalTerm: 25,
+      accumulatedAmount: 520000,
+      surrenderValue: 480000,
+      joinDate: '2016-03-15',
+      askingPrice: 65000,
+      platformFee: 1300,
+      netAmount: 63700,
+      seller: '0xabc...456',
+      listed: '2 hours ago',
+      verified: true,
+      rating: 'A+ (S&P)',
+      documents: ['policy_certificate.pdf', 'dividend_history.pdf'],
+      escrowReady: true,
+      conciergeIncluded: true,
+      images: ['policy1.jpg', 'certificate1.jpg'],
+      expectedDividend: 18500,
+      compoundRate: 6.8,
+      currency: 'HKD',
+      region: 'Hong Kong',
+      ipfsHash: 'QmXoYpU7CN3RkrgkcGc8YvhHUiVRob2tnDUxanJzyRdd6P',
+      aiValuation: 74500,
+      hkiaPerformance: { fulfillmentRate: 0.96, performanceRating: 'A+' }
+    },
+    {
+      id: 'GLB002',
+      type: 'critical_illness',
+      company: 'Great Eastern Singapore',
+      productName: 'GREAT SupremeCare',
+      annualPremium: 35000,
+      paidYears: 10,
+      totalTerm: 'Lifetime',
+      accumulatedAmount: 420000,
+      surrenderValue: 380000,
+      joinDate: '2014-08-22',
+      askingPrice: 52000,
+      platformFee: 1040,
+      netAmount: 50960,
+      seller: '0xdef...789',
+      listed: '4 hours ago',
+      verified: true,
+      rating: 'A (AM Best)',
+      documents: ['policy_certificate.pdf', 'medical_report.pdf'],
+      escrowReady: true,
+      conciergeIncluded: true,
+      images: ['policy2.jpg'],
+      expectedDividend: 0,
+      compoundRate: null,
+      currency: 'SGD',
+      region: 'Singapore',
+      ipfsHash: 'QmYrpU8CN3RkrgkcGc9YvhHUiVRob2tnDUxanJzy123dP',
+      aiValuation: 58900,
+      hkiaPerformance: null
+    },
+    {
+      id: 'GLB003',
+      type: 'endowment',
+      company: 'Zurich International',
+      productName: 'Vista Portfolio Bond',
+      annualPremium: 100000,
+      paidYears: 3,
+      totalTerm: 15,
+      accumulatedAmount: 340000,
+      surrenderValue: 315000,
+      joinDate: '2021-11-05',
+      askingPrice: 325000,
+      platformFee: 6500,
+      netAmount: 318500,
+      seller: '0x123...abc',
+      listed: '1 day ago',
+      verified: true,
+      rating: 'AA- (Fitch)',
+      documents: ['policy_certificate.pdf', 'fund_performance.pdf'],
+      escrowReady: true,
+      conciergeIncluded: true,
+      images: ['policy3.jpg', 'performance3.jpg'],
+      expectedDividend: 15600,
+      compoundRate: 8.4,
+      currency: 'USD',
+      region: 'Isle of Man',
+      ipfsHash: 'QmZspU9CN3RkrgkcGc0YvhHUiVRob2tnDUxanJzy456eP',
+      aiValuation: 348000,
+      hkiaPerformance: null
+    }
+  ]);
+
   // Advanced AI Valuation Engine
   const calculateAdvancedAIValuation = (policy) => {
     if (!policy.company || !policy.accumulatedAmount) return 0;
@@ -321,6 +415,76 @@ const WellSwapPlatform = () => {
     }, 5000);
   };
 
+  // Multi-sig Functions
+  const initiatePurchase = (policy) => {
+    if (!web3State.isConnected) {
+      addNotification(t('notification.connect.required'), 'error');
+      return;
+    }
+
+    const newTransaction = {
+      id: `TX${Date.now()}`,
+      policyId: policy.id,
+      policyName: policy.productName,
+      buyer: web3State.account,
+      seller: policy.seller,
+      amount: policy.askingPrice,
+      platformFee: policy.platformFee,
+      status: 'escrow_created',
+      signatures: {
+        buyer: false,
+        seller: false,
+        platform: false
+      },
+      createdAt: new Date(),
+      escrowAddress: `0x${Math.random().toString(16).substr(2, 8)}...${Math.random().toString(16).substr(2, 3)}`
+    };
+
+    setActiveTransactions(prev => [newTransaction, ...prev]);
+    addNotification(`${policy.productName} ${t('notification.escrow.created')}`, 'success');
+    setCurrentPage('transaction');
+  };
+
+  const signTransaction = (transactionId, role) => {
+    setActiveTransactions(prev => 
+      prev.map(tx => {
+        if (tx.id === transactionId) {
+          const newSignatures = { ...tx.signatures, [role]: true };
+          const allSigned = Object.values(newSignatures).every(signed => signed);
+          
+          return {
+            ...tx,
+            signatures: newSignatures,
+            status: allSigned ? 'completed' : 'awaiting_signatures'
+          };
+        }
+        return tx;
+      })
+    );
+    
+    addNotification(t('notification.transaction.signed'), 'success');
+  };
+
+  // File Upload Functions
+  const handleFileUpload = (files, type) => {
+    if (type === 'documents') {
+      setSellerForm(prev => ({
+        ...prev,
+        documents: [...prev.documents, ...Array.from(files)]
+      }));
+    } else if (type === 'photos') {
+      setSellerForm(prev => ({
+        ...prev,
+        photos: [...prev.photos, ...Array.from(files)]
+      }));
+    }
+    addNotification(`${files.length} ${t('notification.files.uploaded')}`, 'success');
+  };
+
+  const handleCameraCapture = () => {
+    addNotification(t('notification.camera.feature'), 'info');
+  };
+
   // Form Validation
   const validateForm = () => {
     const required = ['policyType', 'company', 'productName', 'annualPremium', 'askingPrice'];
@@ -442,100 +606,6 @@ const WellSwapPlatform = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Global Insurance Market Data
-  const [mockPolicies, setMockPolicies] = useState([
-    {
-      id: 'GLB001',
-      type: 'endowment',
-      company: 'AIA Hong Kong',
-      productName: 'Premier Retirement Savings Plan',
-      annualPremium: 50000,
-      paidYears: 8,
-      totalTerm: 25,
-      accumulatedAmount: 520000,
-      surrenderValue: 480000,
-      joinDate: '2016-03-15',
-      askingPrice: 65000,
-      platformFee: 1300,
-      netAmount: 63700,
-      seller: '0xabc...456',
-      listed: '2 hours ago',
-      verified: true,
-      rating: 'A+ (S&P)',
-      documents: ['policy_certificate.pdf', 'dividend_history.pdf'],
-      escrowReady: true,
-      conciergeIncluded: true,
-      images: ['policy1.jpg', 'certificate1.jpg'],
-      expectedDividend: 18500,
-      compoundRate: 6.8,
-      currency: 'HKD',
-      region: 'Hong Kong',
-      ipfsHash: 'QmXoYpU7CN3RkrgkcGc8YvhHUiVRob2tnDUxanJzyRdd6P',
-      aiValuation: 74500,
-      hkiaPerformance: { fulfillmentRate: 0.96, performanceRating: 'A+' }
-    },
-    {
-      id: 'GLB002',
-      type: 'critical_illness',
-      company: 'Great Eastern Singapore',
-      productName: 'GREAT SupremeCare',
-      annualPremium: 35000,
-      paidYears: 10,
-      totalTerm: 'Lifetime',
-      accumulatedAmount: 420000,
-      surrenderValue: 380000,
-      joinDate: '2014-08-22',
-      askingPrice: 52000,
-      platformFee: 1040,
-      netAmount: 50960,
-      seller: '0xdef...789',
-      listed: '4 hours ago',
-      verified: true,
-      rating: 'A (AM Best)',
-      documents: ['policy_certificate.pdf', 'medical_report.pdf'],
-      escrowReady: true,
-      conciergeIncluded: true,
-      images: ['policy2.jpg'],
-      expectedDividend: 0,
-      compoundRate: null,
-      currency: 'SGD',
-      region: 'Singapore',
-      ipfsHash: 'QmYrpU8CN3RkrgkcGc9YvhHUiVRob2tnDUxanJzy123dP',
-      aiValuation: 58900,
-      hkiaPerformance: null
-    },
-    {
-      id: 'GLB003',
-      type: 'endowment',
-      company: 'Zurich International',
-      productName: 'Vista Portfolio Bond',
-      annualPremium: 100000,
-      paidYears: 3,
-      totalTerm: 15,
-      accumulatedAmount: 340000,
-      surrenderValue: 315000,
-      joinDate: '2021-11-05',
-      askingPrice: 325000,
-      platformFee: 6500,
-      netAmount: 318500,
-      seller: '0x123...abc',
-      listed: '1 day ago',
-      verified: true,
-      rating: 'AA- (Fitch)',
-      documents: ['policy_certificate.pdf', 'fund_performance.pdf'],
-      escrowReady: true,
-      conciergeIncluded: true,
-      images: ['policy3.jpg', 'performance3.jpg'],
-      expectedDividend: 15600,
-      compoundRate: 8.4,
-      currency: 'USD',
-      region: 'Isle of Man',
-      ipfsHash: 'QmZspU9CN3RkrgkcGc0YvhHUiVRob2tnDUxanJzy456eP',
-      aiValuation: 348000,
-      hkiaPerformance: null
-    }
-  ]);
-
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
@@ -571,6 +641,11 @@ const WellSwapPlatform = () => {
       'notification.wallet.install': 'Please install MetaMask',
       'notification.wallet.failed': 'Failed to connect wallet',
       'notification.connect.required': 'Please connect your wallet first',
+      'notification.escrow.created': 'escrow created',
+      'notification.transaction.signed': 'Transaction signed',
+      'notification.files.uploaded': ' file(s) uploaded successfully',
+      'notification.camera.feature': 'Camera feature would open here',
+      'notification.form.required': 'Please fill in all required fields',
       'notification.policy.listed': 'Policy listed successfully! IPFS hash generated.',
       'page.title.marketplace': 'Global Insurance Marketplace',
       'page.subtitle.marketplace': 'Trade verified insurance policies with Web3 security and IPFS storage'
@@ -706,649 +781,6 @@ const WellSwapPlatform = () => {
       </div>
     </nav>
   );
-
-  // Advanced Seller Form with OCR and Real Validation
-  const renderAdvancedSellerForm = () => (
-    <div className="min-h-screen bg-gray-50 pt-24 px-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <button
-            onClick={() => setCurrentPage('userTypeSelection')}
-            className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6"
-          >
-            <ArrowRight className="w-4 h-4 mr-2 rotate-180" />
-            Back to Selection
-          </button>
-          
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">List Your Insurance Policy</h1>
-          <p className="text-gray-600">Upload your insurance certificate or enter details manually</p>
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* OCR Upload Section */}
-          <div className="bg-white rounded-2xl p-8 border border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-              <Camera className="w-6 h-6 mr-2 text-blue-600" />
-              {t('label.upload.certificate')}
-            </h2>
-
-            {/* Camera Section */}
-            <div className="mb-6">
-              {!cameraActive ? (
-                <button
-                  onClick={startCamera}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center"
-                >
-                  <Camera className="w-5 h-5 mr-2" />
-                  {t('button.start.camera')}
-                </button>
-              ) : (
-                <div className="space-y-4">
-                  <video ref={videoRef} autoPlay className="w-full rounded-lg" />
-                  <canvas ref={canvasRef} className="hidden" />
-                  <div className="flex space-x-4">
-                    <button
-                      onClick={capturePhoto}
-                      className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold hover:bg-green-700 transition-colors"
-                    >
-                      {t('button.capture.photo')}
-                    </button>
-                    <button
-                      onClick={stopCamera}
-                      className="flex-1 bg-gray-600 text-white py-3 rounded-xl font-semibold hover:bg-gray-700 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* File Upload */}
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors cursor-pointer">
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                accept="image/*"
-                onChange={(e) => {
-                  if (e.target.files[0]) {
-                    processImageOCR(e.target.files[0]);
-                  }
-                }}
-                className="hidden" 
-              />
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full"
-                disabled={isProcessingImage}
-              >
-                {isProcessingImage ? (
-                  <RefreshCw className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-spin" />
-                ) : (
-                  <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                )}
-                <div className="text-gray-600 font-medium">
-                  {isProcessingImage ? 'Processing...' : 'Upload Insurance Certificate'}
-                </div>
-                <div className="text-sm text-gray-500 mt-2">
-                  {isProcessingImage ? 'AI is reading your document' : 'JPG, PNG files supported (Max 10MB)'}
-                </div>
-              </button>
-            </div>
-
-            {/* OCR Results */}
-            {ocrResult && (
-              <div className="mt-6 bg-green-50 rounded-xl p-4 border border-green-200">
-                <h3 className="font-semibold text-green-900 mb-3 flex items-center">
-                  <ScanLine className="w-5 h-5 mr-2" />
-                  OCR Results (Confidence: {(ocrResult.confidence * 100).toFixed(1)}%)
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <div><span className="font-medium">Policy Number:</span> {ocrResult.policyNumber}</div>
-                  <div><span className="font-medium">Company:</span> {ocrResult.company}</div>
-                  <div><span className="font-medium">Product:</span> {ocrResult.productName}</div>
-                  <div><span className="font-medium">Join Date:</span> {ocrResult.joinDate}</div>
-                </div>
-              </div>
-            )}
-
-            {/* HKIA Data */}
-            {hkiaData && (
-              <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200">
-                <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
-                  <Database className="w-5 h-5 mr-2" />
-                  HKIA Performance Data
-                  {isLoading && <RefreshCw className="w-4 h-4 ml-2 animate-spin" />}
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <div><span className="font-medium">Performance Rating:</span> {hkiaData.performanceRating}</div>
-                  <div><span className="font-medium">Fulfillment Rate:</span> {(hkiaData.fulfillmentRate * 100).toFixed(1)}%</div>
-                  <div><span className="font-medium">Historical Return:</span> {(hkiaData.historicalReturn * 100).toFixed(2)}%</div>
-                  <div><span className="font-medium">Status:</span> {hkiaData.regulatoryStatus}</div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Manual Form Section */}
-          <div className="bg-white rounded-2xl p-8 border border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-              <FileText className="w-6 h-6 mr-2 text-purple-600" />
-              {t('label.or.manual')}
-            </h2>
-
-            <div className="space-y-6">
-              {/* Policy Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Policy Type *</label>
-                <select 
-                  value={sellerForm.policyType}
-                  onChange={(e) => setSellerForm({...sellerForm, policyType: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select Policy Type</option>
-                  <option value="endowment">Endowment/Savings Insurance</option>
-                  <option value="critical_illness">Critical Illness Insurance</option>
-                  <option value="life">Life Insurance</option>
-                  <option value="annuity">Annuity</option>
-                </select>
-              </div>
-
-              {/* Company */}
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Insurance Company *</label>
-                <select 
-                  value={sellerForm.company}
-                  onChange={(e) => setSellerForm({...sellerForm, company: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select Insurance Company</option>
-                  <option value="AIA Hong Kong">AIA Hong Kong</option>
-                  <option value="Prudential Hong Kong">Prudential Hong Kong</option>
-                  <option value="Manulife Hong Kong">Manulife Hong Kong</option>
-                  <option value="FWD Insurance">FWD Insurance</option>
-                  <option value="Great Eastern Singapore">Great Eastern Singapore</option>
-                  <option value="Zurich International">Zurich International</option>
-                  <option value="Standard Life">Standard Life</option>
-                </select>
-              </div>
-
-              {/* Product Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Product Name *</label>
-                <input 
-                  type="text" 
-                  value={sellerForm.productName}
-                  onChange={(e) => setSellerForm({...sellerForm, productName: e.target.value})}
-                  placeholder="e.g., Premier Retirement Plan"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Grid for Premium and Currency */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Annual Premium *</label>
-                  <input 
-                    type="number" 
-                    value={sellerForm.annualPremium}
-                    onChange={(e) => setSellerForm({...sellerForm, annualPremium: e.target.value})}
-                    placeholder="50000"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Currency *</label>
-                  <select 
-                    value={sellerForm.currency}
-                    onChange={(e) => setSellerForm({...sellerForm, currency: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="USD">USD</option>
-                    <option value="HKD">HKD</option>
-                    <option value="SGD">SGD</option>
-                    <option value="EUR">EUR</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Years and Terms */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Years Paid *</label>
-                  <input 
-                    type="number" 
-                    value={sellerForm.paidYears}
-                    onChange={(e) => setSellerForm({...sellerForm, paidYears: e.target.value})}
-                    placeholder="8"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Total Term *</label>
-                  <input 
-                    type="text" 
-                    value={sellerForm.totalTerm}
-                    onChange={(e) => setSellerForm({...sellerForm, totalTerm: e.target.value})}
-                    placeholder="25 or Lifetime"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Accumulated Amount */}
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Current Cash Value *</label>
-                <input 
-                  type="number" 
-                  value={sellerForm.accumulatedAmount}
-                  onChange={(e) => setSellerForm({...sellerForm, accumulatedAmount: e.target.value})}
-                  placeholder="520000"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Join Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Policy Start Date *</label>
-                <input 
-                  type="date" 
-                  value={sellerForm.joinDate}
-                  onChange={(e) => setSellerForm({...sellerForm, joinDate: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Asking Price with AI Valuation */}
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Asking Price (USD) *</label>
-                <input 
-                  type="number" 
-                  value={sellerForm.askingPrice}
-                  onChange={(e) => setSellerForm({...sellerForm, askingPrice: e.target.value})}
-                  placeholder="65000"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                {sellerForm.accumulatedAmount && (
-                  <div className="mt-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
-                    <div className="text-sm text-purple-800">
-                      <div className="flex justify-between mb-2">
-                        <span>AI Suggested Value:</span>
-                        <span className="font-bold">${calculateAdvancedAIValuation(sellerForm).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between mb-2">
-                        <span>Platform fee (2%):</span>
-                        <span>-${Math.round(parseInt(sellerForm.askingPrice || 0) * 0.02).toLocaleString()}</span>
-                      </div>
-                      <div className="border-t border-purple-200 pt-2">
-                        <div className="flex justify-between font-semibold">
-                          <span>You receive:</span>
-                          <span>${Math.round(parseInt(sellerForm.askingPrice || 0) * 0.98).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Concierge Service */}
-              <div className="flex items-center space-x-3">
-                <input 
-                  type="checkbox" 
-                  id="concierge"
-                  checked={sellerForm.conciergeHelp}
-                  onChange={(e) => setSellerForm({...sellerForm, conciergeHelp: e.target.checked})}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <label htmlFor="concierge" className="text-sm text-gray-700">
-                  Include concierge assistance for insurance company transfer (Free)
-                </label>
-              </div>
-
-              {/* Security & Encryption Info */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-                <h3 className="font-medium text-green-900 mb-3 flex items-center">
-                  <ShieldCheck className="w-5 h-5 mr-2" />
-                  Web3 Security & Privacy
-                </h3>
-                <div className="space-y-2 text-sm text-green-800">
-                  <div className="flex items-center space-x-2">
-                    <Hash className="w-4 h-4" />
-                    <span>Sensitive data encrypted with AES-256</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Database className="w-4 h-4" />
-                    <span>Decentralized storage on IPFS network</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Key className="w-4 h-4" />
-                    <span>Multi-signature smart contract protection</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <button 
-                onClick={submitSellerForm}
-                disabled={!sellerForm.isFormValid || isLoading}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
-                ) : (
-                  <Key className="w-5 h-5 mr-2" />
-                )}
-                {isLoading ? 'Processing...' : 'List Policy with Web3 Security'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* IPFS Status */}
-        {ipfsHash && (
-          <div className="mt-8 bg-white rounded-2xl p-6 border border-gray-200">
-            <h3 className="font-bold text-gray-900 mb-4 flex items-center">
-              <Database className="w-5 h-5 mr-2 text-purple-600" />
-              IPFS Storage Status
-            </h3>
-            <div className="bg-gray-50 rounded-lg p-4 font-mono text-sm">
-              <div className="text-gray-600 mb-2">IPFS Hash:</div>
-              <div className="text-blue-600 break-all">{ipfsHash}</div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // Complete Global Marketplace
-  const renderGlobalMarketplace = () => {
-    const filteredPolicies = mockPolicies.filter(policy => {
-      if (searchFilters.policyType !== 'all' && policy.type !== searchFilters.policyType) return false;
-      if (searchFilters.company !== 'all' && !policy.company.includes(searchFilters.company)) return false;
-      if (searchFilters.currency !== 'all' && policy.currency !== searchFilters.currency) return false;
-      if (searchFilters.region !== 'all' && policy.region !== searchFilters.region) return false;
-      return true;
-    });
-
-    return (
-      <div className="min-h-screen bg-gray-50 pt-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-8">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-4">{t('page.title.marketplace')}</h1>
-                <p className="text-gray-600">{t('page.subtitle.marketplace')}</p>
-              </div>
-              
-              {/* Real-time Market Stats */}
-              <div className="mt-6 lg:mt-0 bg-white rounded-xl p-4 border border-gray-200 min-w-[300px]">
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  <div>
-                    <div className="text-lg font-bold text-blue-600">${(marketData.totalVolume / 1000000).toFixed(1)}M</div>
-                    <div className="text-xs text-gray-500">Total Volume</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold text-green-600">{marketData.avgReturn.toFixed(1)}%</div>
-                    <div className="text-xs text-gray-500">Avg Return</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Advanced Global Filters */}
-            <div className="bg-white rounded-xl p-6 border border-gray-200 mb-8">
-              <div className="grid md:grid-cols-6 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Policy Type</label>
-                  <select 
-                    value={searchFilters.policyType}
-                    onChange={(e) => setSearchFilters({...searchFilters, policyType: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="all">All Types</option>
-                    <option value="endowment">Endowment</option>
-                    <option value="critical_illness">Critical Illness</option>
-                    <option value="life">Life Insurance</option>
-                    <option value="annuity">Annuity</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Company</label>
-                  <select 
-                    value={searchFilters.company}
-                    onChange={(e) => setSearchFilters({...searchFilters, company: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="all">All Companies</option>
-                    <option value="AIA">AIA</option>
-                    <option value="Prudential">Prudential</option>
-                    <option value="Manulife">Manulife</option>
-                    <option value="Great Eastern">Great Eastern</option>
-                    <option value="Zurich">Zurich</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
-                  <select 
-                    value={searchFilters.currency}
-                    onChange={(e) => setSearchFilters({...searchFilters, currency: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="all">All Currencies</option>
-                    <option value="USD">USD</option>
-                    <option value="HKD">HKD</option>
-                    <option value="SGD">SGD</option>
-                    <option value="EUR">EUR</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Region</label>
-                  <select 
-                    value={searchFilters.region}
-                    onChange={(e) => setSearchFilters({...searchFilters, region: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="all">All Regions</option>
-                    <option value="Hong Kong">Hong Kong</option>
-                    <option value="Singapore">Singapore</option>
-                    <option value="Isle of Man">Isle of Man</option>
-                    <option value="Luxembourg">Luxembourg</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Price Range (USD)</label>
-                  <select 
-                    value={searchFilters.priceRange}
-                    onChange={(e) => setSearchFilters({...searchFilters, priceRange: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="all">All Prices</option>
-                    <option value="0-50000">$0 - $50K</option>
-                    <option value="50000-100000">$50K - $100K</option>
-                    <option value="100000+">$100K+</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
-                  <select 
-                    value={searchFilters.sortBy}
-                    onChange={(e) => setSearchFilters({...searchFilters, sortBy: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="newest">Newest First</option>
-                    <option value="price_low">Price: Low to High</option>
-                    <option value="price_high">Price: High to Low</option>
-                    <option value="return">Highest Return</option>
-                    <option value="ai_valuation">AI Valuation</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Global Insurance Policy Cards */}
-          <div className="grid lg:grid-cols-2 xl:grid-cols-3 gap-8">
-            {filteredPolicies.map(policy => {
-              const progressPercentage = policy.totalTerm !== 'Lifetime' ? 
-                (policy.paidYears / policy.totalTerm) * 100 : 
-                Math.min((policy.paidYears / 30) * 100, 100);
-
-              return (
-                <div key={policy.id} className="bg-white rounded-2xl p-6 border border-gray-200 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-                  {/* Header with Policy Type and Region */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-2">
-                      <div className={`text-xs px-3 py-1 rounded-full font-medium ${
-                        policy.type === 'endowment' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                      }`}>
-                        {policy.verified && <CheckCircle className="w-3 h-3 inline mr-1" />}
-                        {policy.type.charAt(0).toUpperCase() + policy.type.slice(1).replace('_', ' ')}
-                      </div>
-                      <div className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded-full">
-                        {policy.region}
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-500">{policy.listed}</div>
-                  </div>
-
-                  {/* Company & Product */}
-                  <div className="mb-4">
-                    <div className="text-lg font-bold text-gray-900 mb-1">{policy.productName}</div>
-                    <div className="text-sm text-gray-600 flex items-center">
-                      <Shield className="w-4 h-4 mr-1" />
-                      {policy.company}
-                      <span className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded">{policy.rating}</span>
-                    </div>
-                  </div>
-
-                  {/* Basic Information */}
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-blue-50 rounded-lg p-3">
-                      <div className="text-xs text-blue-600 font-medium mb-1">Annual Premium</div>
-                      <div className="text-sm font-semibold">
-                        {policy.currency} {policy.annualPremium.toLocaleString()}
-                      </div>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-3">
-                      <div className="text-xs text-green-600 font-medium mb-1">Cash Value</div>
-                      <div className="text-sm font-semibold">
-                        {policy.currency} {policy.accumulatedAmount.toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment Progress */}
-                  <div className="mb-4">
-                    <div className="flex justify-between text-xs text-gray-600 mb-2">
-                      <span>Payment Progress</span>
-                      <span>{policy.paidYears}/{policy.totalTerm === 'Lifetime' ? '∞' : policy.totalTerm} years</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div 
-                        className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(progressPercentage, 100)}%` }}
-                      ></div>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">{progressPercentage.toFixed(1)}% completed</div>
-                  </div>
-
-                  {/* AI Valuation vs Asking Price */}
-                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 mb-4 border border-purple-200">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-purple-700 font-medium flex items-center">
-                          <Calculator className="w-3 h-3 mr-1" />
-                          AI Valuation
-                        </span>
-                        <span className="text-sm font-bold text-purple-900">
-                          ${policy.aiValuation?.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-blue-700 font-medium">Asking Price</span>
-                        <span className="text-sm font-bold text-blue-900">
-                          ${policy.askingPrice.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="border-t border-purple-200 pt-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-gray-600">vs Surrender Value</span>
-                          <span className="text-xs font-medium text-green-600">
-                            +{(((policy.askingPrice - policy.surrenderValue) / policy.surrenderValue) * 100).toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* IPFS & Security Info */}
-                  <div className="mb-4 bg-gray-50 rounded-lg p-3 border border-gray-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center">
-                        <Database className="w-4 h-4 text-gray-600 mr-2" />
-                        <span className="text-xs text-gray-700 font-medium">IPFS Secured</span>
-                      </div>
-                      <span className="text-xs text-gray-500">
-                        {policy.ipfsHash?.substr(0, 8)}...
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-4 text-xs text-gray-500">
-                      <div className="flex items-center">
-                        <ShieldCheck className="w-3 h-3 mr-1" />
-                        <span>Encrypted</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Key className="w-3 h-3 mr-1" />
-                        <span>Multi-Sig</span>
-                      </div>
-                      {policy.hkiaPerformance && (
-                        <div className="flex items-center">
-                          <FileSearch className="w-3 h-3 mr-1" />
-                          <span>HKIA Verified</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="space-y-2">
-                    <button 
-                      onClick={() => initiatePurchase(policy)}
-                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center"
-                    >
-                      <Key className="w-4 h-4 mr-2" />
-                      {t('button.secure.purchase')}
-                    </button>
-                    <button className="w-full border border-gray-300 text-gray-700 py-2 rounded-xl font-medium hover:bg-gray-50 transition-all duration-200 flex items-center justify-center">
-                      <Eye className="w-4 h-4 mr-2" />
-                      {t('button.view.details')}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          
-          {filteredPolicies.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-gray-400 mb-4">
-                <Search className="w-16 h-16 mx-auto" />
-              </div>
-              <h3 className="text-xl font-medium text-gray-900 mb-2">No policies found</h3>
-              <p className="text-gray-600 mb-6">Try adjusting your filters or be the first to list a policy</p>
-              <button 
-                onClick={() => setCurrentPage('sellerForm')}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200"
-              >
-                {t('button.list.policy')}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   // Landing Page for Global Platform
   const renderLandingPage = () => (
@@ -1549,15 +981,33 @@ const WellSwapPlatform = () => {
     </div>
   );
 
+  // Simple placeholder pages
+  const renderSimplePage = (title, description) => (
+    <div className="min-h-screen bg-gray-50 pt-24 px-6">
+      <div className="max-w-4xl mx-auto text-center">
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">{title}</h1>
+        <p className="text-xl text-gray-600 mb-8">{description}</p>
+        <button 
+          onClick={() => setCurrentPage('landing')}
+          className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all duration-200"
+        >
+          Back to Home
+        </button>
+      </div>
+    </div>
+  );
+
   // Current page rendering
   const renderCurrentPage = () => {
     switch(currentPage) {
       case 'landing':
         return renderLandingPage();
-      case 'marketplace':
-        return renderGlobalMarketplace();
-      case 'sellerForm':
-        return renderAdvancedSellerForm();
+      case 'concierge':
+        return renderSimplePage('Concierge Service', 'Professional assistance for insurance transfer procedures');
+      case 'about':
+        return renderSimplePage('About WellSwap', 'Learn about our global DeFi insurance trading platform');
+      case 'support':
+        return renderSimplePage('Help & Support', 'Get help with Web3 trading and platform features');
       default:
         return renderLandingPage();
     }
